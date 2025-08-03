@@ -23,4 +23,4 @@ ENV DATABASE_URL=sqlite:///data/database.db
 EXPOSE 8000
 
 # Komenda uruchamiająca aplikację
-CMD ["python", "app/main.py"] 
+CMD ["uvicorn", "app.routes:app", "--host", "0.0.0.0", "--port", "8080"] 
