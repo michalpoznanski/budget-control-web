@@ -57,10 +57,20 @@ async def analyze_csv(
             if line.strip():
                 values = line.split(',')
                 if len(values) >= 3:
+                    # Oczyść i przetwórz kwotę
+                    kwota_raw = values[2].strip()
+                    kwota_clean = kwota_raw.replace('"', '').replace("'", '')
+                    
+                    try:
+                        kwota = float(kwota_clean) if kwota_clean else 0.0
+                    except ValueError:
+                        print(f"Invalid amount: {kwota_raw}")
+                        continue  # Pomiń tę linię
+                    
                     transaction = {
                         'data': values[0].strip(),
                         'opis': values[1].strip(),
-                        'kwota': float(values[2].strip()) if values[2].strip() else 0.0
+                        'kwota': kwota
                     }
                     transactions.append(transaction)
         
