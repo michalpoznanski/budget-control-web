@@ -17,13 +17,21 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Konfiguracja szablonów Jinja2
 templates = Jinja2Templates(directory="templates")
 
-# Inicjalizacja bazy danych
+# Inicjalizacja bazy danych z obsługą błędów
 @app.on_event("startup")
 async def startup_event():
-    init_db()
+    try:
+        init_db()
+    except Exception as e:
+        print(f"Warning: Database initialization failed: {e}")
 
 # Dodanie routera
 app.include_router(router)
+
+# Prosty healthcheck endpoint
+@app.get("/health")
+async def health_check():
+    return {"message": "Budget Control Web API", "status": "healthy"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
