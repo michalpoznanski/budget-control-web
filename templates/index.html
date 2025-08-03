@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget Control Web - Analiza Wydatków</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💰 Budget Control Web</h1>
+            <p>Analiza wydatków z wyciągów bankowych</p>
+        </header>
+
+        <main>
+            <!-- Sekcja uploadu pliku -->
+            <section class="upload-section">
+                <h2>📁 Prześlij wyciąg bankowy (CSV)</h2>
+                
+                {% if request.query_params.get('success') %}
+                <div class="alert success">
+                    ✅ Analiza została wykonana pomyślnie!
+                </div>
+                {% endif %}
+                
+                {% if request.query_params.get('error') %}
+                <div class="alert error">
+                    ❌ Błąd: {{ request.query_params.get('error') }}
+                </div>
+                {% endif %}
+                
+                <form action="/analyze" method="post" enctype="multipart/form-data" class="upload-form">
+                    <div class="form-group">
+                        <label for="csv_file">Wybierz plik CSV:</label>
+                        <input type="file" id="csv_file" name="csv_file" accept=".csv" required>
+                        <small>Plik powinien zawierać kolumny: data, opis, kwota, saldo</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="week_start_date">Data rozpoczęcia tygodnia (opcjonalna):</label>
+                        <input type="date" id="week_start_date" name="week_start_date">
+                        <small>Pozostaw puste, aby automatycznie określić tydzień</small>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">
+                        🔍 ANALIZUJ WYDATKI
+                    </button>
+                </form>
+            </section>
+
+            <!-- Sekcja historii analiz -->
+            <section class="history-section">
+                <h2>📊 Historia Analiz</h2>
+                
+                {% if history %}
+                <div class="history-grid">
+                    {% for analysis in history %}
+                    <div class="analysis-card">
+                        <div class="card-header">
+                            <h3>Tydzień {{ analysis.week_start }} - {{ analysis.week_end }}</h3>
+                            <span class="analysis-date">{{ analysis.analysis_date[:10] }}</span>
+                        </div>
+                        
+                        <div class="card-content">
+                            <div class="stat-row">
+                                <span class="stat-label">Łączne wydatki:</span>
+                                <span class="stat-value">{{ "%.2f"|format(analysis.total_expenses) }} zł</span>
+                            </div>
+                            
+                            <div class="stat-row">
+                                <span class="stat-label">Średnio dziennie:</span>
+                                <span class="stat-value">{{ "%.2f"|format(analysis.avg_daily_expense) }} zł</span>
+                            </div>
+                            
+                            <div class="stat-row">
+                                <span class="stat-label">Liczba transakcji:</span>
+                                <span class="stat-value">{{ analysis.transaction_count }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="card-actions">
+                            <button class="btn-secondary" onclick="showDetails({{ analysis.id }})">
+                                📋 Szczegóły
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <p>📝 Brak analiz. Prześlij pierwszy plik CSV, aby rozpocząć!</p>
+                </div>
+                {% endif %}
+            </section>
+
+            <!-- Sekcja zarządzania kategoriami -->
+            <section class="management-section">
+                <h2>🏷️ Zarządzanie Kategoriami</h2>
+                
+                {% if nieprzypisane_count > 0 %}
+                <div class="alert warning">
+                    ⚠️ Masz {{ nieprzypisane_count }} nieprzypisanych transakcji wymagających kategoryzacji!
+                </div>
+                {% endif %}
+                
+                <div class="management-grid">
+                    <div class="management-card">
+                        <h3>📋 Ręczne przypisywanie</h3>
+                        <p>Przypisz kategorie do nieprzypisanych transakcji i naucz system nowych reguł.</p>
+                        <a href="/manual" class="btn-primary">Przejdź do przypisywania</a>
+                    </div>
+                    
+                    <div class="management-card">
+                        <h3>📊 Reguły kategoryzacji</h3>
+                        <p>Zobacz i zarządzaj regułami automatycznego przypisywania kategorii.</p>
+                        <a href="/rules" class="btn-secondary">Zobacz reguły</a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sekcja statystyk (przyszłość) -->
+            <section class="stats-section">
+                <h2>📈 Statystyki i Porównania</h2>
+                <div class="stats-placeholder">
+                    <p>🔮 W przyszłości tutaj pojawią się:</p>
+                    <ul>
+                        <li>Porównania z poprzednimi tygodniami</li>
+                        <li>Wykresy wydatków według kategorii</li>
+                        <li>Trendy wydatków w czasie</li>
+                        <li>Alerty o przekroczeniu budżetu</li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 Budget Control Web - Analiza wydatków z wyciągów bankowych</p>
+        </footer>
+    </div>
+
+    <!-- Modal dla szczegółów analizy -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="modalBody">
+                <!-- Zawartość będzie ładowana dynamicznie -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Funkcja do pokazywania szczegółów analizy
+        function showDetails(analysisId) {
+            // TODO: Implementacja AJAX do pobierania szczegółów
+            alert('Funkcja szczegółów będzie dostępna w przyszłej wersji!');
+        }
+
+        // Obsługa modala
+        const modal = document.getElementById('detailsModal');
+        const span = document.getElementsByClassName('close')[0];
+
+        span.onclick = function() {
+            modal.style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html> 

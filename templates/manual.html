@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ręczne Przypisywanie Kategorii - Budget Control Web</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏷️ Ręczne Przypisywanie Kategorii</h1>
+            <p>Przypisz kategorie do nieprzypisanych transakcji</p>
+        </header>
+
+        <main>
+            <!-- Alerty -->
+            {% if request.query_params.get('success') %}
+            <div class="alert success">
+                ✅ {{ request.query_params.get('success') if request.query_params.get('success') != 'true' else 'Kategoria została przypisana pomyślnie!' }}
+            </div>
+            {% endif %}
+            
+            {% if request.query_params.get('error') %}
+            <div class="alert error">
+                ❌ Błąd: {{ request.query_params.get('error') }}
+            </div>
+            {% endif %}
+
+            <!-- Informacja o nowej analizie -->
+            {% if new_analysis %}
+            <div class="alert info">
+                📊 Nowa analiza została wykonana! Niektóre transakcje wymagają ręcznego przypisania kategorii.
+            </div>
+            {% endif %}
+
+            <!-- Statystyki -->
+            <section class="stats-section">
+                <h2>📈 Statystyki</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Nieprzypisane transakcje</h3>
+                        <p class="stat-number">{{ nieprzypisane|length }}</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Dostępne kategorie</h3>
+                        <p class="stat-number">{{ kategorie|length }}</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Szybkie przypisywanie dla wszystkich -->
+            {% if nieprzypisane %}
+            <section class="bulk-assign-section">
+                <h2>⚡ Szybkie przypisywanie</h2>
+                <form action="/manual/assign-all" method="post" class="bulk-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fraza">Fraza w opisie:</label>
+                            <input type="text" id="fraza" name="fraza" placeholder="np. THAI WOK" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="kategoria_bulk">Kategoria:</label>
+                            <select id="kategoria_bulk" name="kategoria" required>
+                                <option value="">Wybierz kategorię</option>
+                                {% for kat in kategorie %}
+                                <option value="{{ kat }}">{{ kat|title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary">Przypisz do wszystkich pasujących</button>
+                    </div>
+                </form>
+            </section>
+            {% endif %}
+
+            <!-- Lista nieprzypisanych transakcji -->
+            <section class="transactions-section">
+                <h2>📋 Nieprzypisane transakcje</h2>
+                
+                {% if nieprzypisane %}
+                <div class="transactions-list">
+                    {% for trans in nieprzypisane %}
+                    <div class="transaction-card">
+                        <div class="transaction-header">
+                            <h3>{{ trans.description }}</h3>
+                            <span class="transaction-date">{{ trans.date.strftime('%Y-%m-%d') }}</span>
+                        </div>
+                        
+                        <div class="transaction-details">
+                            <div class="detail-row">
+                                <span class="detail-label">Kwota:</span>
+                                <span class="detail-value amount">{{ "%.2f"|format(trans.amount) }} zł</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Saldo:</span>
+                                <span class="detail-value">{{ "%.2f"|format(trans.balance) }} zł</span>
+                            </div>
+                        </div>
+                        
+                        <form action="/manual/assign" method="post" class="assign-form">
+                            <input type="hidden" name="transaction_id" value="{{ trans.id }}">
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="fraza_{{ trans.id }}">Fraza do zapisania (opcjonalna):</label>
+                                    <input type="text" id="fraza_{{ trans.id }}" name="fraza" 
+                                           placeholder="np. {{ trans.description[:20] }}..." 
+                                           value="{{ trans.description[:30] }}">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="kategoria_{{ trans.id }}">Kategoria:</label>
+                                    <select id="kategoria_{{ trans.id }}" name="kategoria" required>
+                                        <option value="">Wybierz kategorię</option>
+                                        {% for kat in kategorie %}
+                                        <option value="{{ kat }}">{{ kat|title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <button type="submit" class="btn-secondary">Przypisz</button>
+                            </div>
+                        </form>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <p>🎉 Brak nieprzypisanych transakcji! Wszystkie transakcje mają przypisane kategorie.</p>
+                    <a href="/" class="btn-primary">Wróć do strony głównej</a>
+                </div>
+                {% endif %}
+            </section>
+
+            <!-- Nawigacja -->
+            <section class="navigation-section">
+                <div class="nav-buttons">
+                    <a href="/" class="btn-secondary">🏠 Strona główna</a>
+                    <a href="/rules" class="btn-secondary">📋 Zobacz reguły kategoryzacji</a>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 Budget Control Web - Ręczne przypisywanie kategorii</p>
+        </footer>
+    </div>
+
+    <script>
+        // Automatyczne wypełnianie frazy na podstawie opisu transakcji
+        document.querySelectorAll('.assign-form').forEach(form => {
+            const frazaInput = form.querySelector('input[name="fraza"]');
+            const description = form.closest('.transaction-card').querySelector('h3').textContent;
+            
+            // Jeśli fraza jest pusta, wypełnij opisem
+            if (!frazaInput.value) {
+                frazaInput.value = description.substring(0, 30);
+            }
+        });
+    </script>
+</body>
+</html> 
