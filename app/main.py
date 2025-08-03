@@ -2,6 +2,7 @@ import os
 import uvicorn
 import csv
 import io
+import pandas as pd
 from datetime import datetime
 from dateutil import parser as date_parser
 from fastapi import FastAPI, Request, UploadFile, File, Form
@@ -100,6 +101,37 @@ def parse_date(date_str):
         print(f"Invalid date format: {date_str}")
         return None
 
+def debug_csv_data(df, column_mapping=None, detected_columns=None):
+    """
+    Debuguje dane CSV - zapisuje do pliku i loguje informacje
+    """
+    try:
+        # Zapisz dataframe do pliku tymczasowego
+        debug_path = "/tmp/debug.csv"
+        df.to_csv(debug_path, index=False)
+        print(f"DEBUG: Zapisano dane CSV do {debug_path}")
+        
+        # Loguj informacje o kolumnach
+        print(f"DEBUG: Wykryte kolumny: {list(df.columns)}")
+        
+        if detected_columns:
+            print(f"DEBUG: Kolumny po mapowaniu: {detected_columns}")
+        
+        if column_mapping:
+            print(f"DEBUG: Mapowanie kolumn: {column_mapping}")
+        
+        # Loguj pierwsze 5 wierszy
+        print("DEBUG: Pierwsze 5 wierszy danych:")
+        print(df.head().to_string())
+        
+        # Loguj informacje o dataframe
+        print(f"DEBUG: Rozmiar dataframe: {df.shape}")
+        print(f"DEBUG: Typy danych:")
+        print(df.dtypes)
+        
+    except Exception as e:
+        print(f"DEBUG ERROR: Nie udało się zapisać danych debug: {e}")
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """
@@ -181,6 +213,13 @@ async def analyze_csv(
             transactions.append(transaction)
         
         if not transactions:
+            # Debuguj dane przed zwróceniem błędu
+            try:
+                df = pd.read_csv(io.StringIO(csv_text), dialect=dialect)
+                debug_csv_data(df, column_mapping, detected_columns)
+            except Exception as e:
+                print(f"DEBUG ERROR: Nie udało się utworzyć dataframe: {e}")
+            
             return RedirectResponse(url="/?error=Nie znaleziono prawidłowych transakcji w pliku", status_code=303)
         
         # Przekaż listę transakcji do szablonu
@@ -276,6 +315,13 @@ async def process_csv_with_columns(
             transactions.append(transaction)
         
         if not transactions:
+            # Debuguj dane przed zwróceniem błędu
+            try:
+                df = pd.read_csv(io.StringIO(csv_text), dialect=dialect)
+                debug_csv_data(df, {"data": data_column, "kwota": kwota_column, "opis": opis_column}, [data_column, kwota_column, opis_column])
+            except Exception as e:
+                print(f"DEBUG ERROR: Nie udało się utworzyć dataframe: {e}")
+            
             return RedirectResponse(url="/?error=Nie znaleziono prawidłowych transakcji w pliku", status_code=303)
         
         # Przekaż listę transakcji do szablonu
