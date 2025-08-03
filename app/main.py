@@ -7,7 +7,15 @@ from fastapi.responses import HTMLResponse
 from fastapi import Request
 
 from .routes import router
-from .storage import init_db
+
+# Import storage z obsługą błędów
+try:
+    from .storage import init_db
+    STORAGE_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Storage not available: {e}")
+    STORAGE_AVAILABLE = False
+    init_db = lambda: None
 
 app = FastAPI(title="Budget Control Web", description="Aplikacja do analizy wydatków")
 
@@ -20,10 +28,13 @@ templates = Jinja2Templates(directory="templates")
 # Inicjalizacja bazy danych z obsługą błędów
 @app.on_event("startup")
 async def startup_event():
-    try:
-        init_db()
-    except Exception as e:
-        print(f"Warning: Database initialization failed: {e}")
+    if STORAGE_AVAILABLE:
+        try:
+            init_db()
+        except Exception as e:
+            print(f"Warning: Database initialization failed: {e}")
+    else:
+        print("Warning: Storage not available, skipping database initialization")
 
 # Dodanie routera
 app.include_router(router)

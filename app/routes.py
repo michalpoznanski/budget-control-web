@@ -7,11 +7,26 @@ from typing import Optional
 from .parser import CSVParser
 from .categorizer import TransactionCategorizer
 from .analyzer import ExpenseAnalyzer
-from .storage import (
-    save_analysis, get_analysis_history, wczytaj_reczne_kategorie,
-    get_nieprzypisane_transakcje, przypisz_kategorie_transakcji,
-    usun_regule_kategorii, init_db
-)
+
+# Import storage z obsługą błędów
+try:
+    from .storage import (
+        save_analysis, get_analysis_history, wczytaj_reczne_kategorie,
+        get_nieprzypisane_transakcje, przypisz_kategorie_transakcji,
+        usun_regule_kategorii, init_db
+    )
+    STORAGE_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Storage not available in routes: {e}")
+    STORAGE_AVAILABLE = False
+    # Dummy functions
+    def save_analysis(*args, **kwargs): return 1
+    def get_analysis_history(*args, **kwargs): return []
+    def wczytaj_reczne_kategorie(*args, **kwargs): return []
+    def get_nieprzypisane_transakcje(*args, **kwargs): return []
+    def przypisz_kategorie_transakcji(*args, **kwargs): return False
+    def usun_regule_kategorii(*args, **kwargs): return False
+    def init_db(*args, **kwargs): pass
 
 # Główna aplikacja FastAPI
 app = FastAPI(title="Budget Control Web", description="Aplikacja do analizy wydatków")
@@ -25,7 +40,13 @@ templates = Jinja2Templates(directory="templates")
 # Inicjalizacja bazy danych
 @app.on_event("startup")
 async def startup_event():
-    init_db()
+    if STORAGE_AVAILABLE:
+        try:
+            init_db()
+        except Exception as e:
+            print(f"Warning: Database initialization failed in routes: {e}")
+    else:
+        print("Warning: Storage not available in routes, skipping database initialization")
 
 router = APIRouter()
 
