@@ -1,174 +1,159 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Budget Control Web - Analiza Wydatków</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Budget Control Web</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>💰 Budget Control Web</h1>
-            <p>Analiza wydatków z wyciągów bankowych</p>
-        </header>
+<body class="bg-gray-50 text-gray-800 font-sans">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <header class="mb-8 text-center">
+      <h1 class="text-4xl font-bold text-yellow-600">💰 Budget Control Web</h1>
+      <p class="text-gray-600 mt-2">Analiza wydatków z wyciągów bankowych</p>
+    </header>
 
-        <main>
-            <!-- Sekcja uploadu pliku -->
-            <section class="upload-section">
-                <h2>📁 Prześlij wyciąg bankowy (CSV)</h2>
-                
-                {% if request.query_params.get('success') %}
-                <div class="alert success">
-                    ✅ Analiza została wykonana pomyślnie!
-                </div>
-                {% endif %}
-                
-                {% if request.query_params.get('error') %}
-                <div class="alert error">
-                    ❌ Błąd: {{ request.query_params.get('error') }}
-                </div>
-                {% endif %}
-                
-                <form action="/analyze" method="post" enctype="multipart/form-data" class="upload-form">
-                    <div class="form-group">
-                        <label for="csv_file">Wybierz plik CSV:</label>
-                        <input type="file" id="csv_file" name="csv_file" accept=".csv" required>
-                        <small>Plik powinien zawierać kolumny: data, opis, kwota, saldo</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="week_start_date">Data rozpoczęcia tygodnia (opcjonalna):</label>
-                        <input type="date" id="week_start_date" name="week_start_date">
-                        <small>Pozostaw puste, aby automatycznie określić tydzień</small>
-                    </div>
-                    
-                    <button type="submit" class="btn-primary">
-                        🔍 ANALIZUJ WYDATKI
-                    </button>
-                </form>
-            </section>
+    <section class="mb-10 bg-white rounded-lg shadow p-6">
+      <h2 class="text-2xl font-semibold mb-4">📂 Prześlij wyciąg bankowy (CSV)</h2>
+      <form action="/analyze" method="post" enctype="multipart/form-data" class="space-y-4">
+        <input type="file" name="file" accept=".csv" required class="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:border file:border-gray-300 file:rounded-md file:bg-white file:text-sm file:font-semibold hover:file:bg-gray-100" />
+        <label class="block text-sm text-gray-600">Data rozpoczęcia tygodnia (opcjonalna):</label>
+        <input type="date" name="start_date" class="w-full border rounded p-2" />
+        <button type="submit" class="mt-4 bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">🔍 Analizuj wydatki</button>
+      </form>
+    </section>
 
-            <!-- Sekcja historii analiz -->
-            <section class="history-section">
-                <h2>📊 Historia Analiz</h2>
-                
-                {% if history %}
-                <div class="history-grid">
-                    {% for analysis in history %}
-                    <div class="analysis-card">
-                        <div class="card-header">
-                            <h3>Tydzień {{ analysis.week_start }} - {{ analysis.week_end }}</h3>
-                            <span class="analysis-date">{{ analysis.analysis_date[:10] }}</span>
-                        </div>
-                        
-                        <div class="card-content">
-                            <div class="stat-row">
-                                <span class="stat-label">Łączne wydatki:</span>
-                                <span class="stat-value">{{ "%.2f"|format(analysis.total_expenses) }} zł</span>
-                            </div>
-                            
-                            <div class="stat-row">
-                                <span class="stat-label">Średnio dziennie:</span>
-                                <span class="stat-value">{{ "%.2f"|format(analysis.avg_daily_expense) }} zł</span>
-                            </div>
-                            
-                            <div class="stat-row">
-                                <span class="stat-label">Liczba transakcji:</span>
-                                <span class="stat-value">{{ analysis.transaction_count }}</span>
-                            </div>
-                        </div>
-                        
-                        <div class="card-actions">
-                            <button class="btn-secondary" onclick="showDetails({{ analysis.id }})">
-                                📋 Szczegóły
-                            </button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="empty-state">
-                    <p>📝 Brak analiz. Prześlij pierwszy plik CSV, aby rozpocząć!</p>
-                </div>
-                {% endif %}
-            </section>
+    <section class="mb-10 bg-white rounded-lg shadow p-6">
+      <h2 class="text-2xl font-semibold mb-4">📊 Historia Analiz</h2>
+      <p class="text-gray-600">📄 Brak analiz. Prześlij pierwszy plik CSV, aby rozpocząć!</p>
+    </section>
 
-            <!-- Sekcja zarządzania kategoriami -->
-            <section class="management-section">
-                <h2>🏷️ Zarządzanie Kategoriami</h2>
-                
-                {% if nieprzypisane_count > 0 %}
-                <div class="alert warning">
-                    ⚠️ Masz {{ nieprzypisane_count }} nieprzypisanych transakcji wymagających kategoryzacji!
-                </div>
-                {% endif %}
-                
-                <div class="management-grid">
-                    <div class="management-card">
-                        <h3>📋 Ręczne przypisywanie</h3>
-                        <p>Przypisz kategorie do nieprzypisanych transakcji i naucz system nowych reguł.</p>
-                        <a href="/manual" class="btn-primary">Przejdź do przypisywania</a>
-                    </div>
-                    
-                    <div class="management-card">
-                        <h3>📊 Reguły kategoryzacji</h3>
-                        <p>Zobacz i zarządzaj regułami automatycznego przypisywania kategorii.</p>
-                        <a href="/rules" class="btn-secondary">Zobacz reguły</a>
-                    </div>
-                </div>
-            </section>
+    <section class="mb-10 bg-white rounded-lg shadow p-6">
+      <h2 class="text-2xl font-semibold mb-4">🧠 Zarządzanie Kategoriami</h2>
+      <p class="mb-2">🎯 <strong>Ręczne przypisywanie:</strong> przypisz kategorie do nieprzypisanych transakcji i naucz system reguł.</p>
+      <a href="/assign" class="text-blue-600 hover:underline">Przejdź do przypisywania</a>
+      <hr class="my-4" />
+      <p class="mb-2">📐 <strong>Reguły kategoryzacji:</strong> zobacz i zarządzaj regułami przypisywania kategorii.</p>
+      <a href="/rules" class="text-blue-600 hover:underline">Zobacz reguły</a>
+    </section>
 
-            <!-- Sekcja statystyk (przyszłość) -->
-            <section class="stats-section">
-                <h2>📈 Statystyki i Porównania</h2>
-                <div class="stats-placeholder">
-                    <p>🔮 W przyszłości tutaj pojawią się:</p>
-                    <ul>
-                        <li>Porównania z poprzednimi tygodniami</li>
-                        <li>Wykresy wydatków według kategorii</li>
-                        <li>Trendy wydatków w czasie</li>
-                        <li>Alerty o przekroczeniu budżetu</li>
-                    </ul>
-                </div>
-            </section>
-        </main>
-
-        <footer>
-            <p>&copy; 2024 Budget Control Web - Analiza wydatków z wyciągów bankowych</p>
-        </footer>
-    </div>
-
-    <!-- Modal dla szczegółów analizy -->
-    <div id="detailsModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <div id="modalBody">
-                <!-- Zawartość będzie ładowana dynamicznie -->
-            </div>
+    <section class="bg-white rounded-lg shadow p-6">
+      <h2 class="text-2xl font-semibold mb-4">📈 Statystyki i Porównania</h2>
+      <p class="text-gray-600 mb-4">Przykładowa wizualizacja danych:</p>
+      
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Wykres słupkowy - wydatki według kategorii -->
+        <div class="bg-gray-50 rounded-lg p-4">
+          <h3 class="text-lg font-semibold mb-3 text-center">Wydatki według kategorii</h3>
+          <canvas id="categoryChart" width="400" height="200"></canvas>
         </div>
-    </div>
+        
+        <!-- Wykres liniowy - trend tygodniowy -->
+        <div class="bg-gray-50 rounded-lg p-4">
+          <h3 class="text-lg font-semibold mb-3 text-center">Trend wydatków tygodniowy</h3>
+          <canvas id="trendChart" width="400" height="200"></canvas>
+        </div>
+      </div>
 
-    <script>
-        // Funkcja do pokazywania szczegółów analizy
-        function showDetails(analysisId) {
-            // TODO: Implementacja AJAX do pobierania szczegółów
-            alert('Funkcja szczegółów będzie dostępna w przyszłej wersji!');
-        }
+      <p class="text-gray-600">🧪 W przyszłości pojawią się tutaj:</p>
+      <ul class="list-disc list-inside text-gray-700 mt-2 space-y-1">
+        <li>Porównania z poprzednimi tygodniami</li>
+        <li>Wykresy wydatków według kategorii</li>
+        <li>Trendy wydatków w czasie</li>
+        <li>Alerty o przekroczeniu budżetu</li>
+      </ul>
+    </section>
 
-        // Obsługa modala
-        const modal = document.getElementById('detailsModal');
-        const span = document.getElementsByClassName('close')[0];
+    <footer class="text-center text-sm text-gray-500 mt-10">
+      © 2024 Budget Control Web – Analiza wydatków z wyciągów bankowych
+    </footer>
+  </div>
 
-        span.onclick = function() {
-            modal.style.display = 'none';
-        }
-
-        window.onclick = function(event) {
-            if (event.target == modal) {
-                modal.style.display = 'none';
+  <script>
+    // Wykres słupkowy - wydatki według kategorii
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+    new Chart(categoryCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Jedzenie', 'Transport', 'Zdrowie', 'Rozrywka', 'Rachunki'],
+        datasets: [{
+          label: 'Wydatki (PLN)',
+          data: [300, 150, 200, 120, 250],
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.8)',
+            'rgba(54, 162, 235, 0.8)',
+            'rgba(255, 206, 86, 0.8)',
+            'rgba(75, 192, 192, 0.8)',
+            'rgba(153, 102, 255, 0.8)'
+          ],
+          borderColor: [
+            'rgba(255, 99, 132, 1)',
+            'rgba(54, 162, 235, 1)',
+            'rgba(255, 206, 86, 1)',
+            'rgba(75, 192, 192, 1)',
+            'rgba(153, 102, 255, 1)'
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return value + ' PLN';
+              }
             }
+          }
+        },
+        plugins: {
+          legend: {
+            display: false
+          }
         }
-    </script>
+      }
+    });
+
+    // Wykres liniowy - trend tygodniowy
+    const trendCtx = document.getElementById('trendChart').getContext('2d');
+    new Chart(trendCtx, {
+      type: 'line',
+      data: {
+        labels: ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'],
+        datasets: [{
+          label: 'Dzienne wydatki (PLN)',
+          data: [120, 80, 150, 90, 60, 70, 100],
+          borderColor: 'rgba(75, 192, 192, 1)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return value + ' PLN';
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: false
+          }
+        }
+      }
+    });
+  </script>
 </body>
 </html> 
