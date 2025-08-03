@@ -4,7 +4,7 @@ import csv
 import io
 from datetime import datetime
 from dateutil import parser as date_parser
-from fastapi import FastAPI, Request, UploadFile, File
+from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -19,10 +19,10 @@ templates = Jinja2Templates(directory="templates")
 
 # Mapa kolumn do rozpoznawania różnych formatów CSV
 COLUMN_MAPPING = {
-    "data": ["Data", "Data operacji", "Transaction date", "Date", "data", "DATA"],
-    "kwota": ["Kwota", "Amount", "Wartość", "kwota", "KWOTA"],
-    "opis": ["Opis", "Tytuł", "Title", "Description", "opis", "OPIS"],
-    "saldo": ["Saldo", "Balance", "saldo", "SALDO"]
+    "data": ["data", "Data", "Data operacji", "Transaction Date", "DATA", "Date", "Transaction date"],
+    "kwota": ["kwota", "Kwota", "Amount", "Wartość", "Cena", "Kwota operacji", "KWOTA"],
+    "opis": ["opis", "Opis", "Tytuł", "Description", "Tytuł operacji", "OPIS", "Title"],
+    "saldo": ["saldo", "Saldo", "Balance", "SALDO"]
 }
 
 def detect_column_mapping(headers):
@@ -150,8 +150,9 @@ async def analyze_csv(
         missing_columns = [col for col in required_columns if col not in column_mapping]
         
         if missing_columns:
-            error_msg = f"Brak wymaganych kolumn: {', '.join(missing_columns)}. Wykryte kolumny: {', '.join(detected_columns)}"
-            return RedirectResponse(url=f"/?error={error_msg}", status_code=303)
+            # Przekieruj na stronę przypisywania kolumn z wykrytymi kolumnami
+            columns_param = ','.join(detected_columns)
+            return RedirectResponse(url=f"/assign-columns?columns={columns_param}", status_code=303)
         
         # Przetwórz transakcje
         transactions = []
@@ -190,6 +191,100 @@ async def analyze_csv(
         
     except Exception as e:
         # Przekieruj z komunikatem o błędzie
+        return RedirectResponse(url=f"/?error={str(e)}", status_code=303)
+
+@app.get("/assign-columns", response_class=HTMLResponse)
+async def assign_columns_page(request: Request):
+    """
+    Strona do ręcznego przypisywania kolumn CSV
+    """
+    # Pobierz dane z sesji lub query params
+    detected_columns = request.query_params.get('columns', '').split(',') if request.query_params.get('columns') else []
+    
+    return templates.TemplateResponse("assign_columns.html", {
+        "request": request,
+        "detected_columns": detected_columns
+    })
+
+@app.post("/process-csv")
+async def process_csv_with_columns(
+    request: Request,
+    csv_file: UploadFile = File(...),
+    data_column: str = Form(...),
+    kwota_column: str = Form(...),
+    opis_column: str = Form(...)
+):
+    """
+    Przetwarza CSV z ręcznie przypisanymi kolumnami
+    """
+    try:
+        if not csv_file:
+            return RedirectResponse(url="/?error=Nie wybrano pliku", status_code=303)
+        
+        # Wczytaj plik CSV
+        content = await csv_file.read()
+        csv_text = content.decode('utf-8')
+        
+        # Użyj csv.Sniffer do wykrycia formatu
+        try:
+            dialect = csv.Sniffer().sniff(csv_text[:1024])
+        except:
+            dialect = csv.excel
+        
+        # Parsuj CSV z wykrytym formatem
+        csv_reader = csv.DictReader(io.StringIO(csv_text), dialect=dialect)
+        
+        # Sprawdź czy wybrane kolumny istnieją
+        headers = csv_reader.fieldnames
+        if not headers:
+            return RedirectResponse(url="/?error=Nie można odczytać nagłówków CSV", status_code=303)
+        
+        # Sprawdź czy wybrane kolumny istnieją
+        missing_columns = []
+        for col in [data_column, kwota_column, opis_column]:
+            if col not in headers:
+                missing_columns.append(col)
+        
+        if missing_columns:
+            error_msg = f"Wybrane kolumny nie istnieją: {', '.join(missing_columns)}. Dostępne kolumny: {', '.join(headers)}"
+            return RedirectResponse(url=f"/?error={error_msg}", status_code=303)
+        
+        # Przetwórz transakcje z ręcznie przypisanymi kolumnami
+        transactions = []
+        for row in csv_reader:
+            # Pobierz wartości z wybranych kolumn
+            date_raw = row.get(data_column, "")
+            amount_raw = row.get(kwota_column, "")
+            description_raw = row.get(opis_column, "")
+            
+            # Parsuj datę
+            parsed_date = parse_date(date_raw)
+            if not parsed_date:
+                print(f"Invalid date: {date_raw}")
+                continue
+            
+            # Parsuj kwotę
+            parsed_amount = clean_amount(amount_raw)
+            if parsed_amount is None:
+                continue
+            
+            transaction = {
+                'data': parsed_date,
+                'opis': description_raw.strip(),
+                'kwota': parsed_amount
+            }
+            transactions.append(transaction)
+        
+        if not transactions:
+            return RedirectResponse(url="/?error=Nie znaleziono prawidłowych transakcji w pliku", status_code=303)
+        
+        # Przekaż listę transakcji do szablonu
+        return templates.TemplateResponse("analyze.html", {
+            "request": request,
+            "transactions": transactions
+        })
+        
+    except Exception as e:
         return RedirectResponse(url=f"/?error={str(e)}", status_code=303)
 
 # Prosty healthcheck endpoint
