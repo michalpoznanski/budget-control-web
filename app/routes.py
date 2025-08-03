@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Request, UploadFile, File, Form
+from fastapi import FastAPI, APIRouter, Request, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from typing import Optional
 
 from .parser import CSVParser
@@ -9,11 +10,24 @@ from .analyzer import ExpenseAnalyzer
 from .storage import (
     save_analysis, get_analysis_history, wczytaj_reczne_kategorie,
     get_nieprzypisane_transakcje, przypisz_kategorie_transakcji,
-    usun_regule_kategorii
+    usun_regule_kategorii, init_db
 )
 
-router = APIRouter()
+# Główna aplikacja FastAPI
+app = FastAPI(title="Budget Control Web", description="Aplikacja do analizy wydatków")
+
+# Montowanie plików statycznych
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Konfiguracja szablonów Jinja2
 templates = Jinja2Templates(directory="templates")
+
+# Inicjalizacja bazy danych
+@app.on_event("startup")
+async def startup_event():
+    init_db()
+
+router = APIRouter()
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -183,3 +197,6 @@ async def delete_rule(
             
     except Exception as e:
         return RedirectResponse(url=f"/rules?error={str(e)}", status_code=303) 
+
+# Dodanie routera do aplikacji
+app.include_router(router) 
