@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+import csv
+import io
 
 # Konfiguracja szablonów Jinja2
 templates = Jinja2Templates(directory="templates")
@@ -32,16 +34,14 @@ async def analyze_csv(
         if not csv_file:
             return RedirectResponse(url="/?error=Nie wybrano pliku", status_code=303)
         
-        # Wczytaj plik CSV jako pandas DataFrame
-        import pandas as pd
-        import io
-        
+        # Wczytaj plik CSV
         content = await csv_file.read()
-        df = pd.read_csv(io.StringIO(content.decode('utf-8')))
+        csv_text = content.decode('utf-8')
         
         # Wyciągnij kolumny: data, opis, kwota
         transactions = []
-        for _, row in df.iterrows():
+        csv_reader = csv.DictReader(io.StringIO(csv_text))
+        for row in csv_reader:
             transaction = {
                 'data': str(row.get('data', row.get('Data', row.get('DATA', ''))),
                 'opis': str(row.get('opis', row.get('Opis', row.get('OPIS', ''))),
