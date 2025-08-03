@@ -22,5 +22,8 @@ ENV DATABASE_URL=sqlite:///data/database.db
 # Ekspozycja portu
 EXPOSE 8000
 
+# Nadaj uprawnienia do skryptu startowego
+RUN chmod +x start.sh
+
 # Komenda uruchamiająca aplikację
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT} 
+CMD ["./start.sh"] 
