@@ -25,11 +25,6 @@ async def startup_event():
 # Dodanie routera
 app.include_router(router)
 
-# Endpoint dla healthcheck
-@app.get("/")
-async def root():
-    return {"message": "Budget Control Web API", "status": "healthy"}
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False) 

@@ -29,6 +29,11 @@ async def startup_event():
 
 router = APIRouter()
 
+# Healthcheck endpoint dla Railway
+@router.get("/health")
+async def health_check():
+    return {"message": "Budget Control Web API", "status": "healthy"}
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """
